@@ -1,602 +1,638 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>3D UV Paint Studio</title>
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      user-select: none;
-    }
-    body {
-      background-color: #121212;
-      color: #e0e0e0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      width: 100vw;
-    }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Multi-Object Web3D & UV Paint Studio</title>
+  <style>
+    :root {
+      --bg-dark: #121212;
+      --bg-panel: #1e1e1e;
+      --accent: #e67e22;
+      --accent-blue: #2980b9;
+      --text: #cccccc;
+      --border: #2a2a2a;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+    body { width: 100vw; height: 100vh; overflow: hidden; background: var(--bg-dark); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 13px; display: flex; flex-direction: column; }
+    
+    #container { display: flex; flex: 1; width: 100vw; height: calc(100vh - 48px); overflow: hidden; position: relative; }
+    
+    /* Header */
+    header { height: 48px; background: #181818; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; z-index: 20; }
+    .brand { font-weight: 700; font-size: 14px; letter-spacing: 1px; color: #fff; }
+    .mode-switch { display: flex; background: #0a0a0a; padding: 3px; border-radius: 6px; border: 1px solid #333; }
+    .mode-btn { padding: 6px 14px; font-size: 12px; border: none; background: transparent; color: #888; border-radius: 4px; cursor: pointer; transition: all 0.2s; }
+    .mode-btn.active { background: #2a2a2a; color: #fff; font-weight: 600; }
 
-    /* Header Bar */
-    header {
-      height: 48px;
-      background: #181818;
-      border-bottom: 1px solid #2a2a2a;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 16px;
-      z-index: 20;
-    }
-    .brand {
-      font-weight: 700;
-      font-size: 14px;
-      letter-spacing: 1px;
-      color: #fff;
-    }
-    .mode-switch {
-      display: flex;
-      background: #0a0a0a;
-      padding: 3px;
-      border-radius: 6px;
-      border: 1px solid #333;
-    }
-    .mode-btn {
-      padding: 6px 16px;
-      font-size: 12px;
-      border: none;
-      background: transparent;
-      color: #888;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .mode-btn.active {
-      background: #2a2a2a;
-      color: #fff;
-      font-weight: 600;
-    }
+    /* Viewport */
+    #viewport-container { flex: 1; position: relative; width: 100%; height: 100%; background: #1a1a1a; }
+    #canvas3d { width: 100%; height: 100%; display: block; touch-action: none; }
+    
+    /* Top Bar inside Viewport */
+    #top-bar { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; gap: 6px; z-index: 10; background: rgba(43,43,43,0.85); backdrop-filter: blur(4px); padding: 6px; border-radius: 6px; border: 1px solid var(--border); overflow-x: auto; align-items: center; }
+    button, select, label { background: #383838; color: var(--text); border: 1px solid #555; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; min-height: 32px; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; }
+    button:active, button.active { background: var(--accent); color: #fff; }
 
-    /* Main Workspace Layout */
-    #workspace {
-      flex: 1;
-      display: flex;
-      position: relative;
-      overflow: hidden;
-    }
+    /* Sidebar / Outliner Panel */
+    #sidebar { width: 320px; background: var(--bg-panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; z-index: 5; overflow-y: auto; }
+    
+    /* UV Paint Overlay Panel (ペイントモード専用拡張パネル) */
+    #uv-panel { width: 440px; background: #141414; border-left: 1px solid var(--border); display: none; flex-direction: column; padding: 14px; gap: 12px; z-index: 10; overflow-y: auto; }
+    body.mode-paint #uv-panel { display: flex; }
+    body.mode-paint #sidebar { display: none; }
 
-    #viewport-container {
-      flex: 1;
-      position: relative;
-      background: #1e1e1e;
-      transition: flex 0.3s ease;
-    }
-    #three-canvas {
-      width: 100%;
-      height: 100%;
-      display: block;
-    }
+    .panel-section { border-bottom: 1px solid var(--border); padding: 10px 0; }
+    .panel-header, .panel-title { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #888; margin-bottom: 8px; }
+    .control-group { margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .control-group label { flex: 1; border: none; background: none; justify-content: flex-start; padding: 0; }
+    .control-group input[type="range"] { flex: 1; height: 24px; accent-color: #fff; }
 
-    /* UV Paint Panel (大きめで見やすい構造) */
-    #uv-panel {
-      width: 480px;
-      background: #141414;
-      border-left: 1px solid #2a2a2a;
-      display: flex;
-      flex-direction: column;
-      padding: 16px;
-      gap: 16px;
-      z-index: 10;
-      transition: transform 0.3s ease, margin-right 0.3s ease;
-    }
-    body.mode-view #uv-panel {
-      display: none;
-    }
+    /* Object List */
+    #object-list { list-style: none; padding: 0; margin: 0; max-height: 100px; overflow-y: auto; background: #111; border: 1px solid #333; border-radius: 4px; }
+    #object-list li { padding: 6px 10px; cursor: pointer; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; }
+    #object-list li.selected { background: var(--accent); color: white; }
 
-    .panel-header {
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      color: #777;
-      border-bottom: 1px solid #222;
-      padding-bottom: 6px;
-    }
+    /* UV Canvas Area */
+    #uv-canvas-container { width: 100%; aspect-ratio: 1 / 1; background-color: #1a1a1a; background-image: linear-gradient(45deg, #222 25%, transparent 25%), linear-gradient(-45deg, #222 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #222 75%), linear-gradient(-45deg, transparent 75%, #222 75%); background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0px; border: 1px solid #333; position: relative; border-radius: 6px; overflow: hidden; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
+    #texture-canvas { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+    #uv-wire-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0.8; }
 
-    #uv-canvas-container {
-      width: 100%;
-      aspect-ratio: 1 / 1;
-      /* 透明チェックパターンで見やすく */
-      background-color: #1a1a1a;
-      background-image: 
-        linear-gradient(45deg, #222 25%, transparent 25%), 
-        linear-gradient(-45deg, #222 25%, transparent 25%), 
-        linear-gradient(45deg, transparent 75%, #222 75%), 
-        linear-gradient(-45deg, transparent 75%, #222 75%);
-      background-size: 16px 16px;
-      background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
-      border: 1px solid #333;
-      position: relative;
-      border-radius: 6px;
-      overflow: hidden;
-      box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
-    }
+    .tool-buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    button.tool-btn { background: #222; border: 1px solid #333; color: #ccc; padding: 8px; font-size: 12px; border-radius: 4px; cursor: pointer; }
+    button.tool-btn.active { background: #fff; color: #000; font-weight: bold; border-color: #fff; }
+    .setting-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #aaa; margin-bottom: 6px; }
+  </style>
 
-    #texture-canvas {
-      width: 100%;
-      height: 100%;
-      image-rendering: pixelated;
-      display: block;
-    }
-
-    #uv-wire-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      opacity: 0.8;
-    }
-
-    /* Controls Section */
-    .controls-group {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .tool-buttons {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-    }
-    button.tool-btn {
-      background: #222;
-      border: 1px solid #333;
-      color: #ccc;
-      padding: 10px;
-      font-size: 12px;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    button.tool-btn:hover {
-      background: #333;
-      color: #fff;
-    }
-    button.tool-btn.active {
-      background: #fff;
-      color: #000;
-      font-weight: bold;
-      border-color: #fff;
-    }
-
-    .setting-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 12px;
-      color: #aaa;
-    }
-    input[type="color"] {
-      border: 1px solid #444;
-      width: 32px;
-      height: 32px;
-      border-radius: 4px;
-      cursor: pointer;
-      background: transparent;
-    }
-    input[type="range"] {
-      accent-color: #fff;
-      width: 60%;
-    }
-
-    .action-btn {
-      background: #1f1f1f;
-      border: 1px solid #333;
-      color: #bbb;
-      padding: 8px;
-      font-size: 11px;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    .action-btn:hover {
-      background: #2a2a2a;
-      color: #fff;
-    }
-  </style>
-
-  <!-- Three.js & Controls -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
 </head>
+<body class="mode-cam">
 
-<body class="mode-paint">
+<header>
+  <div class="brand">3D STUDIO & UV PAINT</div>
+  <div class="mode-switch">
+    <button id="btnModeCam" class="mode-btn active">カメラ / 編集</button>
+    <button id="btnModeSculpt" class="mode-btn">スカルプト</button>
+    <button id="btnModePaint" class="mode-btn">UVペイント</button>
+  </div>
+</header>
 
-  <header>
-    <div class="brand">3D UV PAINT STUDIO</div>
-    <div class="mode-switch">
-      <button id="mode-view-btn" class="mode-btn">ビューモード</button>
-      <button id="mode-paint-btn" class="mode-btn active">ペイントモード</button>
-    </div>
-  </header>
+<div id="container">
+  <div id="viewport-container">
+    <div id="top-bar">
+      <select id="addShapeSelect">
+        <option value="plane">板ポリ</option>
+        <option value="cube" selected>立方体</option>
+        <option value="uvSphere">UV球</option>
+        <option value="icoSphere">ICO球</option>
+        <option value="cylinder">円柱</option>
+        <option value="cone">円錐</option>
+        <option value="torus">トーラス</option>
+      </select>
+      <button id="addShapeBtn">+ 追加</button>
+      <label>
+        .OBJ 読み込み <input type="file" id="importObjInput" accept=".obj,.txt" style="display:none;">
+      </label>
+      <button id="exportObjBtn" style="background: #27ae60; color: white;">.OBJ 書き出し</button>
+      <button id="exportTexBtn" style="background: #2980b9; color: white;">テクスチャ保存</button>
+    </div>
 
-  <div id="workspace">
-    <div id="viewport-container">
-      <canvas id="three-canvas"></canvas>
-    </div>
+    <canvas id="canvas3d"></canvas>
+  </div>
 
-    <div id="uv-panel">
-      <div class="panel-header">UV Texture Canvas (Expanded)</div>
-      
-      <div id="uv-canvas-container">
-        <canvas id="texture-canvas" width="1024" height="1024"></canvas>
-        <canvas id="uv-wire-overlay" width="1024" height="1024"></canvas>
-      </div>
+  <!-- Standard Sidebar Panel -->
+  <div id="sidebar">
+    <div class="panel-section">
+      <div class="panel-title">アウトライナー (オブジェクト選択)</div>
+      <ul id="object-list"></ul>
+      <button id="deleteObjBtn" style="width:100%; margin-top:6px; background:#c0392b; color:white;">選択オブジェクトを削除</button>
+    </div>
 
-      <div class="controls-group">
-        <div class="panel-header">Painting Tools</div>
-        <div class="tool-buttons">
-          <button id="tool-pen" class="tool-btn active">ペン</button>
-          <button id="tool-blur" class="tool-btn">ぼかし</button>
-          <button id="tool-pipette" class="tool-btn">スポイト</button>
-        </div>
+    <div class="panel-section">
+      <div class="panel-title">ギズモ (操作軸)</div>
+      <div class="control-group">
+        <button id="gizmoTranslate" style="flex:1;">位置</button>
+        <button id="gizmoRotate" style="flex:1;">回転</button>
+        <button id="gizmoScale" style="flex:1;">拡大</button>
+      </div>
+    </div>
 
-        <div class="setting-row">
-          <label>描画色</label>
-          <input type="color" id="color-primary" value="#ffffff">
-        </div>
+    <div class="panel-section">
+      <div class="panel-title">ステージ設定</div>
+      <div class="control-group">
+        <label>グリッドサイズ</label>
+        <input type="range" id="stageScale" min="5" max="50" step="1" value="10">
+      </div>
+    </div>
 
-        <div class="setting-row">
-          <label>サイズ: <span id="brush-size-val">16px</span></label>
-          <input type="range" id="brush-size" min="4" max="100" value="16">
-        </div>
+    <div class="panel-section">
+      <div class="panel-title">スカルプト設定</div>
+      <div class="control-group">
+        <label>X軸 線対称</label>
+        <input type="checkbox" id="symX">
+      </div>
+      <div class="control-group">
+        <label>半径</label>
+        <input type="range" id="brushRadius" min="0.1" max="2" step="0.1" value="0.5">
+      </div>
+      <div class="control-group">
+        <label>強度</label>
+        <input type="range" id="brushIntensity" min="-0.5" max="0.5" step="0.02" value="0.1">
+      </div>
+    </div>
+  </div>
 
-        <div class="setting-row" id="blur-intensity-row" style="display: none;">
-          <label>ぼかし強度</label>
-          <input type="range" id="blur-intensity" min="1" max="10" value="4">
-        </div>
-      </div>
+  <!-- Extended UV Paint Panel (ペイントモード時に展開) -->
+  <div id="uv-panel">
+    <div class="panel-header">UV Texture Canvas (1024x1024)</div>
+    <div id="uv-canvas-container">
+      <canvas id="texture-canvas" width="1024" height="1024"></canvas>
+      <canvas id="uv-wire-overlay" width="1024" height="1024"></canvas>
+    </div>
 
-      <div class="controls-group">
-        <div class="panel-header">UV & Mesh Utility</div>
-        <button id="btn-re-uv" class="action-btn">UV重なり自動リセット</button>
-      </div>
-    </div>
-  </div>
+    <div class="panel-header">Painting Tools</div>
+    <div class="tool-buttons">
+      <button id="tool-pen" class="tool-btn active">ペン</button>
+      <button id="tool-blur" class="tool-btn">ぼかし</button>
+      <button id="tool-pipette" class="tool-btn">スポイト</button>
+    </div>
 
-  <script>
-    // --- 1. Texture & Canvas Setup ---
-    const texCanvas = document.getElementById('texture-canvas');
-    const texCtx = texCanvas.getContext('2d', { willReadFrequently: true });
-    const overlayCanvas = document.getElementById('uv-wire-overlay');
-    const overlayCtx = overlayCanvas.getContext('2d');
+    <div class="setting-row">
+      <label>描画色</label>
+      <input type="color" id="paintColor" value="#ff0000" style="width:40px; height:28px;">
+    </div>
 
-    // 初期化背景塗りつぶし
-    texCtx.fillStyle = '#2b2b2b';
-    texCtx.fillRect(0, 0, texCanvas.width, texCanvas.height);
+    <div class="setting-row">
+      <label>ブラシサイズ: <span id="brush-size-val">16px</span></label>
+      <input type="range" id="paintSize" min="2" max="100" value="16">
+    </div>
 
-    const texture = new THREE.CanvasTexture(texCanvas);
-    texture.minFilter = THREE.LinearFilter;
-    texture.magFilter = THREE.LinearFilter;
+    <div class="setting-row" id="blur-intensity-row" style="display: none;">
+      <label>ぼかし強度</label>
+      <input type="range" id="blur-intensity" min="1" max="10" value="4">
+    </div>
+  </div>
+</div>
 
-    // --- 2. Mode Switching Logic ---
-    const modeViewBtn = document.getElementById('mode-view-btn');
-    const modePaintBtn = document.getElementById('mode-paint-btn');
+<script type="module">
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+  import { TransformControls } from 'three/addons/controls/TransformControls.js';
+  import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
+  import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 
-    modeViewBtn.addEventListener('click', () => setMode('view'));
-    modePaintBtn.addEventListener('click', () => setMode('paint'));
+  let scene, camera, renderer, orbit, transform, gridHelper;
+  let objects = [];
+  let activeMesh = null;
+  let activeMode = 'camera';
+  let objectCount = 0;
 
-    function setMode(mode) {
-      if (mode === 'view') {
-        document.body.className = 'mode-view';
-        modeViewBtn.classList.add('active');
-        modePaintBtn.classList.remove('active');
-      } else {
-        document.body.className = 'mode-paint';
-        modePaintBtn.classList.add('active');
-        modeViewBtn.classList.remove('active');
-      }
-      onWindowResize();
-    }
+  // UV Texture & Overlay Canvases
+  const texCanvas = document.getElementById('texture-canvas');
+  const texCtx = texCanvas.getContext('2d', { willReadFrequently: true });
+  const overlayCanvas = document.getElementById('uv-wire-overlay');
+  const overlayCtx = overlayCanvas.getContext('2d');
+  let texture;
 
-    // --- 3. Three.js Scene Setup ---
-    const viewport = document.getElementById('viewport-container');
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x181818);
+  // Tool State
+  let currentTool = 'pen'; // 'pen', 'blur', 'pipette'
+  let isUvDrawing = false;
+  let lastUvPoint = null;
 
-    const camera = new THREE.PerspectiveCamera(45, viewport.clientWidth / viewport.clientHeight, 0.1, 1000);
-    camera.position.set(2, 2, 4);
+  init();
+  animate();
 
-    const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('three-canvas'), antialias: true });
-    renderer.setSize(viewport.clientWidth, viewport.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  function init() {
+    const container = document.getElementById('viewport-container');
 
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x181818);
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-    scene.add(ambientLight);
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.4);
-    dirLight.position.set(5, 10, 7);
-    scene.add(dirLight);
+    camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 1000);
+    camera.position.set(3, 3, 5);
 
-    // --- 4. UV Mesh Generation ---
-    const material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.5 });
-    let currentMesh;
+    renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas3d'), antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-    function initMesh() {
-      if (currentMesh) scene.remove(currentMesh);
-      const geometry = new THREE.SphereGeometry(1, 32, 24);
-      currentMesh = new THREE.Mesh(geometry, material);
-      scene.add(currentMesh);
-      drawUVOverlay(geometry);
-    }
+    gridHelper = new THREE.GridHelper(10, 20, 0x444444, 0x222222);
+    scene.add(gridHelper);
 
-    // ハイコントラストなUVワイヤーフレーム表示
-    function drawUVOverlay(geometry) {
-      overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-      overlayCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-      overlayCtx.lineWidth = 1.2;
+    scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+    dirLight.position.set(5, 10, 7);
+    scene.add(dirLight);
 
-      const uvAttr = geometry.attributes.uv;
-      const indexAttr = geometry.index;
-      const w = overlayCanvas.width;
-      const h = overlayCanvas.height;
+    orbit = new OrbitControls(camera, renderer.domElement);
+    orbit.enableDamping = true;
 
-      if (indexAttr) {
-        for (let i = 0; i < indexAttr.count; i += 3) {
-          const i0 = indexAttr.getX(i), i1 = indexAttr.getX(i + 1), i2 = indexAttr.getX(i + 2);
-          const u0 = uvAttr.getX(i0) * w, v0 = (1 - uvAttr.getY(i0)) * h;
-          const u1 = uvAttr.getX(i1) * w, v1 = (1 - uvAttr.getY(i1)) * h;
-          const u2 = uvAttr.getX(i2) * w, v2 = (1 - uvAttr.getY(i2)) * h;
+    transform = new TransformControls(camera, renderer.domElement);
+    transform.addEventListener('dragging-changed', (e) => orbit.enabled = !e.value);
+    scene.add(transform);
 
-          overlayCtx.beginPath();
-          overlayCtx.moveTo(u0, v0);
-          overlayCtx.lineTo(u1, v1);
-          overlayCtx.lineTo(u2, v2);
-          overlayCtx.closePath();
-          overlayCtx.stroke();
-        }
-      }
-    }
+    initUVCanvas();
+    addShape('uvSphere');
 
-    initMesh();
+    window.addEventListener('resize', onWindowResize);
+    setupUI();
+    setupRaycasterAndPaint();
+    setup2DPaintEvents();
+  }
 
-    // --- 5. Tool State & ibisPaint-style Blur ---
-    let currentTool = 'pen'; // 'pen', 'blur', 'pipette'
-    let isDrawing = false;
-    let lastPoint = null;
+  function initUVCanvas() {
+    texCtx.fillStyle = '#ffffff';
+    texCtx.fillRect(0, 0, texCanvas.width, texCanvas.height);
+    texture = new THREE.CanvasTexture(texCanvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+  }
 
-    const primaryColorInput = document.getElementById('color-primary');
-    const brushSizeInput = document.getElementById('brush-size');
-    const brushSizeVal = document.getElementById('brush-size-val');
-    const blurIntensityInput = document.getElementById('blur-intensity');
+  function addShape(type) {
+    let geometry;
+    switch (type) {
+      case 'plane': geometry = new THREE.PlaneGeometry(2, 2, 16, 16); break;
+      case 'cube': geometry = new THREE.BoxGeometry(2, 2, 2, 16, 16, 16); break;
+      case 'uvSphere': geometry = new THREE.SphereGeometry(1.2, 32, 24); break;
+      case 'icoSphere': geometry = new THREE.IcosahedronGeometry(1.2, 2); break;
+      case 'cylinder': geometry = new THREE.CylinderGeometry(1, 1, 2, 32, 16); break;
+      case 'cone': geometry = new THREE.ConeGeometry(1, 2, 32, 16); break;
+      case 'torus': geometry = new THREE.TorusGeometry(1, 0.4, 16, 32); break;
+    }
 
-    brushSizeInput.addEventListener('input', (e) => {
-      brushSizeVal.textContent = e.target.value + 'px';
-    });
+    const material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.5, side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(geometry, material);
+    
+    objectCount++;
+    mesh.name = `${type}_${objectCount}`;
+    mesh.position.set((Math.random() - 0.5) * 1.5, 1, (Math.random() - 0.5) * 1.5);
 
-    document.getElementById('tool-pen').addEventListener('click', (e) => setTool('pen', e.target));
-    document.getElementById('tool-blur').addEventListener('click', (e) => setTool('blur', e.target));
-    document.getElementById('tool-pipette').addEventListener('click', (e) => setTool('pipette', e.target));
+    scene.add(mesh);
+    objects.push(mesh);
+    selectObject(mesh);
+    updateOutliner();
+  }
 
-    function setTool(tool, btn) {
-      currentTool = tool;
-      document.querySelectorAll('.tool-buttons .tool-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById('blur-intensity-row').style.display = tool === 'blur' ? 'flex' : 'none';
-    }
+  function selectObject(mesh) {
+    if (!mesh) return;
+    activeMesh = mesh;
+    if (activeMode === 'camera') {
+      transform.attach(activeMesh);
+    }
+    drawUVOverlay(activeMesh.geometry);
+    updateOutlinerUI();
+  }
 
-    // ペン描画
-    function applyPen(x, y, isFirst = false) {
-      texCtx.fillStyle = primaryColorInput.value;
-      texCtx.strokeStyle = primaryColorInput.value;
-      texCtx.lineWidth = brushSizeInput.value;
-      texCtx.lineCap = 'round';
-      texCtx.lineJoin = 'round';
+  function drawUVOverlay(geometry) {
+    overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+    overlayCtx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+    overlayCtx.lineWidth = 1.0;
 
-      if (isFirst || !lastPoint) {
-        texCtx.beginPath();
-        texCtx.arc(x, y, brushSizeInput.value / 2, 0, Math.PI * 2);
-        texCtx.fill();
-      } else {
-        texCtx.beginPath();
-        texCtx.moveTo(lastPoint.x, lastPoint.y);
-        texCtx.lineTo(x, y);
-        texCtx.stroke();
-      }
-      lastPoint = { x, y };
-      texture.needsUpdate = true;
-    }
+    const uvAttr = geometry.attributes.uv;
+    const indexAttr = geometry.index;
+    if (!uvAttr) return;
 
-    // ibisPaint風 リアルタイム周辺ぼかし（Gaussian Blur風フィルタ）
-    function applyBlur(x, y) {
-      const radius = parseInt(brushSizeInput.value);
-      const intensity = parseInt(blurIntensityInput.value);
-      
-      const startX = Math.max(0, Math.floor(x - radius));
-      const startY = Math.max(0, Math.floor(y - radius));
-      const size = radius * 2;
-      const width = Math.min(texCanvas.width - startX, size);
-      const height = Math.min(texCanvas.height - startY, size);
+    const w = overlayCanvas.width;
+    const h = overlayCanvas.height;
 
-      if (width <= 0 || height <= 0) return;
+    if (indexAttr) {
+      for (let i = 0; i < indexAttr.count; i += 3) {
+        const i0 = indexAttr.getX(i), i1 = indexAttr.getX(i + 1), i2 = indexAttr.getX(i + 2);
+        const u0 = uvAttr.getX(i0) * w, v0 = (1 - uvAttr.getY(i0)) * h;
+        const u1 = uvAttr.getX(i1) * w, v1 = (1 - uvAttr.getY(i1)) * h;
+        const u2 = uvAttr.getX(i2) * w, v2 = (1 - uvAttr.getY(i2)) * h;
 
-      const imgData = texCtx.getImageData(startX, startY, width, height);
-      const data = imgData.data;
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(u0, v0);
+        overlayCtx.lineTo(u1, v1);
+        overlayCtx.lineTo(u2, v2);
+        overlayCtx.closePath();
+        overlayCtx.stroke();
+      }
+    }
+  }
 
-      // 円形マスク内で単純BOXボカシ適用
-      for (let pass = 0; pass < intensity; pass++) {
-        for (let py = 1; py < height - 1; py++) {
-          for (let px = 1; px < width - 1; px++) {
-            const dx = px - radius;
-            const dy = py - radius;
-            if (dx * dx + dy * dy > radius * radius) continue; // 円形外はスキップ
+  function setupRaycasterAndPaint() {
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let isTouching = false;
 
-            const idx = (py * width + px) * 4;
-            
-            // 周辺8方向ピクセルの平均値計算
-            for (let c = 0; c < 3; c++) {
-              const avg = (
-                data[((py - 1) * width + (px - 1)) * 4 + c] +
-                data[((py - 1) * width + px) * 4 + c] +
-                data[((py - 1) * width + (px + 1)) * 4 + c] +
-                data[(py * width + (px - 1)) * 4 + c] +
-                data[(py * width + px) * 4 + c] +
-                data[(py * width + (px + 1)) * 4 + c] +
-                data[((py + 1) * width + (px - 1)) * 4 + c] +
-                data[((py + 1) * width + px) * 4 + c] +
-                data[((py + 1) * width + (px + 1)) * 4 + c]
-              ) / 9;
+    const getHitObject = (e) => {
+      const rect = renderer.domElement.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-              data[idx + c] = avg;
-            }
-          }
-        }
-      }
+      mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
 
-      texCtx.putImageData(imgData, startX, startY);
-      texture.needsUpdate = true;
-    }
+      raycaster.setFromCamera(mouse, camera);
+      return raycaster.intersectObjects(objects, true);
+    };
 
-    // スポイト
-    function applyPipette(x, y) {
-      const pixel = texCtx.getImageData(x, y, 1, 1).data;
-      const hex = "#" + ((1 << 24) + (pixel[0] << 16) + (pixel[1] << 8) + pixel[2]).toString(16).slice(1);
-      primaryColorInput.value = hex;
-    }
+    const dom = renderer.domElement;
 
-    // 3Dレイキャスト座標取得
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
+    dom.addEventListener('pointerdown', (e) => {
+      isTouching = true;
+      if (activeMode === 'camera') {
+        const intersects = getHitObject(e);
+        if (intersects.length > 0 && objects.includes(intersects[0].object)) {
+          selectObject(intersects[0].object);
+        }
+      } else {
+        handlePointerAction(e, true);
+      }
+    });
 
-    function getUVFromRaycast(e) {
-      const rect = renderer.domElement.getBoundingClientRect();
-      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    dom.addEventListener('pointermove', (e) => {
+      if (isTouching && activeMode !== 'camera') {
+        handlePointerAction(e, false);
+      }
+    });
 
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObject(currentMesh);
+    window.addEventListener('pointerup', () => {
+      isTouching = false;
+      lastUvPoint = null;
+    });
 
-      if (intersects.length > 0 && intersects[0].uv) {
-        const uv = intersects[0].uv;
-        return {
-          x: uv.x * texCanvas.width,
-          y: (1 - uv.y) * texCanvas.height
-        };
-      }
-      return null;
-    }
+    function handlePointerAction(e, isFirst) {
+      if (!activeMesh) return;
+      const intersects = getHitObject(e);
+      const hit = intersects.find(i => i.object === activeMesh);
 
-    // 3Dキャンバスでの入力イベント
-    renderer.domElement.addEventListener('pointerdown', (e) => {
-      if (document.body.classList.contains('mode-view')) return;
-      const pt = getUVFromRaycast(e);
-      if (!pt) return;
+      if (hit) {
+        if (activeMode === 'sculpt') {
+          const r = parseFloat(document.getElementById('brushRadius').value);
+          const val = parseFloat(document.getElementById('brushIntensity').value);
+          applySculpt(hit.point, val, r);
+        } else if (activeMode === 'paint' && hit.uv) {
+          const px = hit.uv.x * texCanvas.width;
+          const py = (1 - hit.uv.y) * texCanvas.height;
+          executePaintTool(px, py, isFirst);
+        }
+      }
+    }
+  }
 
-      isDrawing = true;
-      controls.enabled = false;
+  function executePaintTool(x, y, isFirst = false) {
+    const color = document.getElementById('paintColor').value;
+    const size = parseInt(document.getElementById('paintSize').value);
 
-      if (currentTool === 'pen') applyPen(pt.x, pt.y, true);
-      else if (currentTool === 'blur') applyBlur(pt.x, pt.y);
-      else if (currentTool === 'pipette') applyPipette(pt.x, pt.y);
-    });
+    if (currentTool === 'pen') {
+      texCtx.fillStyle = color;
+      texCtx.strokeStyle = color;
+      texCtx.lineWidth = size;
+      texCtx.lineCap = 'round';
+      texCtx.lineJoin = 'round';
 
-    renderer.domElement.addEventListener('pointermove', (e) => {
-      if (!isDrawing) return;
-      const pt = getUVFromRaycast(e);
-      if (!pt) return;
+      if (isFirst || !lastUvPoint) {
+        texCtx.beginPath();
+        texCtx.arc(x, y, size / 2, 0, Math.PI * 2);
+        texCtx.fill();
+      } else {
+        texCtx.beginPath();
+        texCtx.moveTo(lastUvPoint.x, lastUvPoint.y);
+        texCtx.lineTo(x, y);
+        texCtx.stroke();
+      }
+      lastUvPoint = { x, y };
+      texture.needsUpdate = true;
 
-      if (currentTool === 'pen') applyPen(pt.x, pt.y);
-      else if (currentTool === 'blur') applyBlur(pt.x, pt.y);
-    });
+    } else if (currentTool === 'blur') {
+      applyBlur(x, y, size);
+    } else if (currentTool === 'pipette') {
+      applyPipette(x, y);
+    }
+  }
 
-    // 2D UVキャンバスでの入力イベント
-    texCanvas.addEventListener('pointerdown', (e) => {
-      const rect = texCanvas.getBoundingClientRect();
-      const x = (e.clientX - rect.left) * (texCanvas.width / rect.width);
-      const y = (e.clientY - rect.top) * (texCanvas.height / rect.height);
+  function applyBlur(x, y, radius) {
+    const intensity = parseInt(document.getElementById('blur-intensity').value);
+    const startX = Math.max(0, Math.floor(x - radius));
+    const startY = Math.max(0, Math.floor(y - radius));
+    const size = radius * 2;
+    const width = Math.min(texCanvas.width - startX, size);
+    const height = Math.min(texCanvas.height - startY, size);
 
-      isDrawing = true;
+    if (width <= 0 || height <= 0) return;
 
-      if (currentTool === 'pen') applyPen(x, y, true);
-      else if (currentTool === 'blur') applyBlur(x, y);
-      else if (currentTool === 'pipette') applyPipette(x, y);
-    });
+    const imgData = texCtx.getImageData(startX, startY, width, height);
+    const data = imgData.data;
 
-    texCanvas.addEventListener('pointermove', (e) => {
-      if (!isDrawing) return;
-      const rect = texCanvas.getBoundingClientRect();
-      const x = (e.clientX - rect.left) * (texCanvas.width / rect.width);
-      const y = (e.clientY - rect.top) * (texCanvas.height / rect.height);
+    for (let pass = 0; pass < intensity; pass++) {
+      for (let py = 1; py < height - 1; py++) {
+        for (let px = 1; px < width - 1; px++) {
+          const dx = px - radius;
+          const dy = py - radius;
+          if (dx * dx + dy * dy > radius * radius) continue;
 
-      if (currentTool === 'pen') applyPen(x, y);
-      else if (currentTool === 'blur') applyBlur(x, y);
-    });
+          const idx = (py * width + px) * 4;
+          for (let c = 0; c < 3; c++) {
+            const avg = (
+              data[((py - 1) * width + (px - 1)) * 4 + c] +
+              data[((py - 1) * width + px) * 4 + c] +
+              data[((py - 1) * width + (px + 1)) * 4 + c] +
+              data[(py * width + (px - 1)) * 4 + c] +
+              data[(py * width + px) * 4 + c] +
+              data[(py * width + (px + 1)) * 4 + c] +
+              data[((py + 1) * width + (px - 1)) * 4 + c] +
+              data[((py + 1) * width + px) * 4 + c] +
+              data[((py + 1) * width + (px + 1)) * 4 + c]
+            ) / 9;
+            data[idx + c] = avg;
+          }
+        }
+      }
+    }
+    texCtx.putImageData(imgData, startX, startY);
+    texture.needsUpdate = true;
+  }
 
-    window.addEventListener('pointerup', () => {
-      isDrawing = false;
-      lastPoint = null;
-      controls.enabled = true;
-    });
+  function applyPipette(x, y) {
+    const pixel = texCtx.getImageData(Math.floor(x), Math.floor(y), 1, 1).data;
+    const hex = "#" + ((1 << 24) + (pixel[0] << 16) + (pixel[1] << 8) + pixel[2]).toString(16).slice(1);
+    document.getElementById('paintColor').value = hex;
+  }
 
-    document.getElementById('btn-re-uv').addEventListener('click', initMesh);
+  function setup2DPaintEvents() {
+    const container = document.getElementById('uv-canvas-container');
 
-    // リサイズ処理
-    function onWindowResize() {
-      camera.aspect = viewport.clientWidth / viewport.clientHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(viewport.clientWidth, viewport.clientHeight);
-    }
-    window.addEventListener('resize', onWindowResize);
+    const getCanvasPos = (e) => {
+      const rect = texCanvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return {
+        x: ((clientX - rect.left) / rect.width) * texCanvas.width,
+        y: ((clientY - rect.top) / rect.height) * texCanvas.height
+      };
+    };
 
-    // メインアニメーションループ
-    function animate() {
-      requestAnimationFrame(animate);
-      controls.update();
-      renderer.render(scene, camera);
-    }
-    animate();
-  </script>
+    container.addEventListener('pointerdown', (e) => {
+      isUvDrawing = true;
+      const pos = getCanvasPos(e);
+      executePaintTool(pos.x, pos.y, true);
+    });
+
+    container.addEventListener('pointermove', (e) => {
+      if (isUvDrawing) {
+        const pos = getCanvasPos(e);
+        executePaintTool(pos.x, pos.y, false);
+      }
+    });
+
+    window.addEventListener('pointerup', () => {
+      isUvDrawing = false;
+      lastUvPoint = null;
+    });
+  }
+
+  function applySculpt(hitPoint, intensity, radius) {
+    if (!activeMesh || !activeMesh.geometry.attributes.position) return;
+    const pos = activeMesh.geometry.attributes.position;
+    const localHit = activeMesh.worldToLocal(hitPoint.clone());
+    const symX = document.getElementById('symX').checked;
+
+    for (let i = 0; i < pos.count; i++) {
+      const v = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+      modifyVertex(v, localHit, intensity, radius);
+      if (symX) {
+        const symHit = localHit.clone(); symHit.x *= -1;
+        modifyVertex(v, symHit, intensity, radius);
+      }
+      pos.setXYZ(i, v.x, v.y, v.z);
+    }
+    pos.needsUpdate = true;
+    activeMesh.geometry.computeVertexNormals();
+  }
+
+  function modifyVertex(v, center, intensity, radius) {
+    const dist = v.distanceTo(center);
+    if (dist < radius) {
+      const falloff = (1 - dist / radius);
+      const dir = v.clone().sub(center).normalize();
+      if (dir.length() === 0) dir.set(0, 1, 0);
+      v.addScaledVector(dir, intensity * falloff);
+    }
+  }
+
+  function switchMode(mode) {
+    activeMode = mode;
+    document.body.className = mode === 'paint' ? 'mode-paint' : 'mode-cam';
+    document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+
+    if (mode === 'camera') {
+      document.getElementById('btnModeCam').classList.add('active');
+      orbit.enabled = true;
+      if (activeMesh) transform.attach(activeMesh);
+    } else {
+      transform.detach();
+      orbit.enabled = (mode === 'paint'); // ペイントモード時は視点回転を維持
+      if (mode === 'sculpt') document.getElementById('btnModeSculpt').classList.add('active');
+      if (mode === 'paint') document.getElementById('btnModePaint').classList.add('active');
+    }
+    onWindowResize();
+  }
+
+  function setTool(tool, btn) {
+    currentTool = tool;
+    document.querySelectorAll('.tool-buttons .tool-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('blur-intensity-row').style.display = tool === 'blur' ? 'flex' : 'none';
+  }
+
+  function updateOutliner() {
+    const list = document.getElementById('object-list');
+    list.innerHTML = '';
+    objects.forEach(obj => {
+      const li = document.createElement('li');
+      li.textContent = obj.name;
+      if (obj === activeMesh) li.classList.add('selected');
+      li.addEventListener('click', () => selectObject(obj));
+      list.appendChild(li);
+    });
+  }
+
+  function updateOutlinerUI() {
+    const listItems = document.querySelectorAll('#object-list li');
+    listItems.forEach((li, idx) => {
+      if (objects[idx] === activeMesh) li.classList.add('selected');
+      else li.classList.remove('selected');
+    });
+  }
+
+  function setupUI() {
+    document.getElementById('btnModeCam').addEventListener('click', () => switchMode('camera'));
+    document.getElementById('btnModeSculpt').addEventListener('click', () => switchMode('sculpt'));
+    document.getElementById('btnModePaint').addEventListener('click', () => switchMode('paint'));
+
+    document.getElementById('tool-pen').addEventListener('click', (e) => setTool('pen', e.target));
+    document.getElementById('tool-blur').addEventListener('click', (e) => setTool('blur', e.target));
+    document.getElementById('tool-pipette').addEventListener('click', (e) => setTool('pipette', e.target));
+
+    document.getElementById('paintSize').addEventListener('input', (e) => {
+      document.getElementById('brush-size-val').textContent = e.target.value + 'px';
+    });
+
+    document.getElementById('addShapeBtn').addEventListener('click', () => addShape(document.getElementById('addShapeSelect').value));
+    document.getElementById('deleteObjBtn').addEventListener('click', () => {
+      if (!activeMesh) return;
+      transform.detach();
+      scene.remove(activeMesh);
+      objects = objects.filter(o => o !== activeMesh);
+      activeMesh = objects.length > 0 ? objects[objects.length - 1] : null;
+      if (activeMesh && activeMode === 'camera') transform.attach(activeMesh);
+      updateOutliner();
+    });
+
+    document.getElementById('gizmoTranslate').addEventListener('click', () => transform.setMode('translate'));
+    document.getElementById('gizmoRotate').addEventListener('click', () => transform.setMode('rotate'));
+    document.getElementById('gizmoScale').addEventListener('click', () => transform.setMode('scale'));
+
+    document.getElementById('stageScale').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      scene.remove(gridHelper);
+      gridHelper = new THREE.GridHelper(val, val * 2, 0x444444, 0x222222);
+      scene.add(gridHelper);
+    });
+
+    document.getElementById('exportObjBtn').addEventListener('click', () => {
+      if (objects.length === 0) return;
+      const exporter = new OBJExporter();
+      const exportGroup = new THREE.Group();
+      objects.forEach(o => exportGroup.add(o.clone()));
+      const result = exporter.parse(exportGroup);
+      const blob = new Blob([result], { type: 'text/plain' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'scene_model.obj';
+      link.click();
+      URL.revokeObjectURL(link.href);
+    });
+
+    document.getElementById('exportTexBtn').addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.href = texCanvas.toDataURL('image/png');
+      link.download = 'uv_texture.png';
+      link.click();
+    });
+  }
+
+  function onWindowResize() {
+    const container = document.getElementById('viewport-container');
+    camera.aspect = container.clientWidth / container.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(container.clientWidth, container.clientHeight);
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+    orbit.update();
+    renderer.render(scene, camera);
+  }
+</script>
 </body>
 </html>
-に
-<!-- サイドパネル内の「スカルプト & UVペイント」セクションを以下のように更新 -->
-<div class="panel-section">
-  <div class="panel-title">操作モード切り替え</div>
-  <div class="control-group" style="gap: 4px;">
-    <button class="mode-btn active" id="btnModeCam" style="flex:1;">カメラ</button>
-    <button class="mode-btn" id="btnModeSculpt" style="flex:1;">スカルプト</button>
-    <button class="mode-btn" id="btnModePaint" style="flex:1;">ペイント</button>
-  </div>
-</div>
-
-<div class="panel-section">
-  <div class="panel-title">ブラシ設定 (スカルプト / ペイント)</div>
-  <div class="control-group">
-    <label>筆カラー</label>
-    <input type="color" id="paintColor" value="#ff0000" style="width:50px; height:30px;">
-  </div>
-  <div class="control-group">
-    <label>筆の太さ (ペイント)</label>
-    <input type="range" id="paintSize" min="2" max="40" step="1" value="12">
-  </div>
-  <div class="control-group">
-    <label>X軸 線対称</label>
-    <input type="checkbox" id="symX">
-  </div>
-  <div class="control-group">
-    <label>スカルプト半径</label>
-    <input type="range" id="brushRadius" min="0.1" max="2" step="0.1" value="0.5">
-  </div>
-  <div class="control-group">
-    <label>スカルプト強度</label>
-    <input type="range" id="brushIntensity" min="-0.5" max="0.5" step="0.02" value="0.1">
-  </div>
-</div>
-を追加ね。2番目のプログラムでペイントモードにになったら瀬名苦衷の図形をUVして書き込めるように。
