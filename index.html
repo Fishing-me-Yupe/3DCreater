@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Touch-friendly Web3D Studio</title>
+  <title>Multi-Object Web3D Studio</title>
   <style>
     :root {
       --bg-dark: #1e1e1e;
@@ -13,34 +13,37 @@
       --border: #3f3f3f;
     }
     * { box-sizing: border-box; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
-    body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: var(--bg-dark); color: var(--text); font-family: sans-serif; font-size: 14px; }
+    body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: var(--bg-dark); color: var(--text); font-family: sans-serif; font-size: 13px; }
     #container { display: flex; flex-direction: column; width: 100vw; height: 100vh; }
     
     #viewport-container { flex: 1; position: relative; width: 100%; height: 100%; }
     #canvas3d { width: 100%; height: 100%; display: block; touch-action: none; }
     
-    /* Responsive Top Bar */
-    #top-bar { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; gap: 6px; z-index: 10; background: rgba(43,43,43,0.92); padding: 8px; border-radius: 6px; border: 1px solid var(--border); overflow-x: auto; white-space: nowrap; align-items: center; }
-    button, select { background: #383838; color: var(--text); border: 1px solid #555; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; min-height: 38px; }
+    /* Top Menu Bar */
+    #top-bar { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; gap: 6px; z-index: 10; background: rgba(43,43,43,0.92); padding: 8px; border-radius: 6px; border: 1px solid var(--border); overflow-x: auto; align-items: center; }
+    button, select, input[type="file"] { background: #383838; color: var(--text); border: 1px solid #555; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; min-height: 34px; }
     button:active, button.active { background: var(--accent); color: #fff; }
     
-    /* Touch Mode Toggle Floating Panel */
     #touch-modes { position: absolute; bottom: 16px; left: 16px; z-index: 10; display: flex; gap: 8px; background: rgba(30,30,30,0.85); padding: 6px; border-radius: 8px; border: 1px solid var(--border); }
     .mode-btn { min-width: 60px; text-align: center; font-weight: bold; }
 
-    /* Collapsible Right Sidebar */
-    #sidebar { width: 100%; max-height: 40vh; background: var(--bg-panel); border-top: 1px solid var(--border); display: flex; flex-direction: column; z-index: 5; overflow-y: auto; }
+    /* Sidebar / Outliner Panel */
+    #sidebar { width: 100%; max-height: 45vh; background: var(--bg-panel); border-top: 1px solid var(--border); display: flex; flex-direction: column; z-index: 5; overflow-y: auto; }
     @media (min-width: 768px) {
       #container { flex-direction: row; }
-      #sidebar { width: 300px; max-height: 100%; border-top: none; border-left: 1px solid var(--border); }
+      #sidebar { width: 320px; max-height: 100%; border-top: none; border-left: 1px solid var(--border); }
     }
     
-    .panel-section { border-bottom: 1px solid var(--border); padding: 12px; }
+    .panel-section { border-bottom: 1px solid var(--border); padding: 10px; }
     .panel-title { font-weight: bold; margin-bottom: 8px; color: #fff; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; }
-    .control-group { margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+    .control-group { margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
     .control-group label { flex: 1; }
-    .control-group input[type="range"] { flex: 1; height: 28px; }
-    .control-group input[type="checkbox"] { width: 22px; height: 22px; }
+    .control-group input[type="range"] { flex: 1; height: 24px; }
+    
+    /* Outliner Object List */
+    #object-list { list-style: none; padding: 0; margin: 0; max-height: 120px; overflow-y: auto; background: #1a1a1a; border: 1px solid #444; border-radius: 4px; }
+    #object-list li { padding: 6px 10px; cursor: pointer; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
+    #object-list li.selected { background: var(--accent); color: white; }
   </style>
 
   <script type="importmap">
@@ -57,6 +60,7 @@
 <div id="container">
   <div id="viewport-container">
     <div id="top-bar">
+      <!-- Shape Addition -->
       <select id="addShapeSelect">
         <option value="plane">板ポリ</option>
         <option value="cube" selected>立方体</option>
@@ -66,11 +70,17 @@
         <option value="cone">円錐</option>
         <option value="torus">トーラス</option>
       </select>
-      <button id="addShapeBtn">+ 図形追加</button>
-      <button id="exportObjBtn" style="margin-left: auto; background: #27ae60; color: white;">.OBJ 保存</button>
+      <button id="addShapeBtn">+ 追加</button>
+
+      <!-- OBJ File I/O -->
+      <label style="background:#383838; padding:6px 10px; border:1px solid #555; border-radius:4px; cursor:pointer;">
+        .OBJ 読み込み <input type="file" id="importObjInput" accept=".obj" style="display:none;">
+      </label>
+      <button id="exportObjBtn" style="background: #27ae60; color: white;">.OBJ 書き出し</button>
+      <button id="exportTexBtn" style="background: #2980b9; color: white;">テクスチャ保存</button>
     </div>
 
-    <!-- Floating Mode Buttons for Mobile -->
+    <!-- Mode Selector -->
     <div id="touch-modes">
       <button class="mode-btn active" id="btnModeCam">カメラ</button>
       <button class="mode-btn" id="btnModeSculpt">スカルプト</button>
@@ -80,8 +90,25 @@
     <canvas id="canvas3d"></canvas>
   </div>
 
-  <!-- Sidebar (Bottom on Mobile, Right on Tablet/Desktop) -->
+  <!-- Sidebar Controls -->
   <div id="sidebar">
+    <!-- Object List (Outliner) -->
+    <div class="panel-section">
+      <div class="panel-title">アウトライナー (オブジェクト一覧)</div>
+      <ul id="object-list"></ul>
+      <button id="deleteObjBtn" style="width:100%; margin-top:6px; background:#c0392b; color:white;">選択オブジェクトを削除</button>
+    </div>
+
+    <!-- Stage / Grid Scaling -->
+    <div class="panel-section">
+      <div class="panel-title">ステージ（グリッド）設定</div>
+      <div class="control-group">
+        <label>ステージサイズ</label>
+        <input type="range" id="stageScale" min="5" max="50" step="1" value="10">
+      </div>
+    </div>
+
+    <!-- Transform Gizmo -->
     <div class="panel-section">
       <div class="panel-title">ギズモ（操作軸）</div>
       <div class="control-group">
@@ -91,22 +118,15 @@
       </div>
     </div>
 
+    <!-- Symmetry & Brush Controls -->
     <div class="panel-section">
-      <div class="panel-title">対称モード</div>
+      <div class="panel-title">スカルプト & UVペイント</div>
       <div class="control-group">
-        <label>X軸 線対称 (Mirror)</label>
+        <label>X軸 線対称</label>
         <input type="checkbox" id="symX">
       </div>
       <div class="control-group">
-        <label>点対称 (Point Sym)</label>
-        <input type="checkbox" id="symPoint">
-      </div>
-    </div>
-
-    <div class="panel-section">
-      <div class="panel-title">ブラシアジャスト</div>
-      <div class="control-group">
-        <label>サイズ/半径</label>
+        <label>ブラシ半径</label>
         <input type="range" id="brushRadius" min="0.1" max="2" step="0.1" value="0.5">
       </div>
       <div class="control-group">
@@ -115,7 +135,7 @@
       </div>
       <div class="control-group">
         <label>筆カラー</label>
-        <input type="color" id="paintColor" value="#ff0000" style="width:50px; height:35px;">
+        <input type="color" id="paintColor" value="#ff0000" style="width:50px; height:30px;">
       </div>
     </div>
   </div>
@@ -126,13 +146,17 @@
   import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
   import { TransformControls } from 'three/addons/controls/TransformControls.js';
   import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
+  import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 
-  let scene, camera, renderer, orbit, transform;
+  let scene, camera, renderer, orbit, transform, gridHelper;
+  let objects = []; // Scene objects container
   let activeMesh = null;
-  let activeMode = 'camera'; // 'camera' | 'sculpt' | 'paint'
+  let activeMode = 'camera';
+  let objectCount = 0;
 
+  // Global UV Canvas Context
   const uvCanvas = document.createElement('canvas');
-  uvCanvas.width = 256; uvCanvas.height = 256;
+  uvCanvas.width = 512; uvCanvas.height = 512;
   const uvCtx = uvCanvas.getContext('2d');
   let texture;
 
@@ -146,35 +170,33 @@
     scene.background = new THREE.Color(0x222222);
 
     camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
-    camera.position.set(3, 3, 5);
+    camera.position.set(4, 4, 6);
 
     renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas3d'), antialias: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-    scene.add(new THREE.GridHelper(10, 20, 0x555555, 0x333333));
-    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    // Dynamic Grid Setup
+    gridHelper = new THREE.GridHelper(10, 20, 0x555555, 0x333333);
+    scene.add(gridHelper);
 
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
     const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
     dirLight.position.set(5, 10, 7);
     scene.add(dirLight);
 
-    // OrbitControls Touch Options Optimization
     orbit = new OrbitControls(camera, renderer.domElement);
-    orbit.touches = {
-      ONE: THREE.TOUCH.ROTATE,
-      TWO: THREE.TOUCH.DOLLY_PAN
-    };
+    orbit.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
 
     transform = new TransformControls(camera, renderer.domElement);
     transform.addEventListener('dragging-changed', (e) => orbit.enabled = !e.value);
     scene.add(transform);
 
     initUVCanvas();
-    addShape('cube');
+    addShape('cube'); // Add initial mesh
 
     window.addEventListener('resize', onWindowResize);
-    setupTouchAndUI();
+    setupUI();
     setupRaycaster();
   }
 
@@ -184,9 +206,8 @@
     texture = new THREE.CanvasTexture(uvCanvas);
   }
 
+  // --- 図形の多重追加・管理機能 ---
   function addShape(type) {
-    if (activeMesh) scene.remove(activeMesh);
-
     let geometry;
     switch (type) {
       case 'plane': geometry = new THREE.PlaneGeometry(2, 2, 16, 16); break;
@@ -199,12 +220,83 @@
     }
 
     const material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.5, side: THREE.DoubleSide });
-    activeMesh = new THREE.Mesh(geometry, material);
-    scene.add(activeMesh);
-    if (activeMode === 'camera') transform.attach(activeMesh);
+    const mesh = new THREE.Mesh(geometry, material);
+    
+    objectCount++;
+    mesh.name = `${type}_${objectCount}`;
+    // Shift overlapping positions
+    mesh.position.set((Math.random() - 0.5) * 2, 1, (Math.random() - 0.5) * 2);
+
+    scene.add(mesh);
+    objects.push(mesh);
+    selectObject(mesh);
+    updateOutliner();
   }
 
-  // --- Sculpting & Painting for Touch Input ---
+  function selectObject(mesh) {
+    activeMesh = mesh;
+    if (activeMode === 'camera' && activeMesh) {
+      transform.attach(activeMesh);
+    }
+    updateOutlinerUI();
+  }
+
+  function deleteSelectedObject() {
+    if (!activeMesh) return;
+    transform.detach();
+    scene.remove(activeMesh);
+    objects = objects.filter(o => o !== activeMesh);
+    activeMesh = objects.length > 0 ? objects[objects.length - 1] : null;
+    if (activeMesh && activeMode === 'camera') transform.attach(activeMesh);
+    updateOutliner();
+  }
+
+  function updateOutliner() {
+    const list = document.getElementById('object-list');
+    list.innerHTML = '';
+    objects.forEach(obj => {
+      const li = document.createElement('li');
+      li.textContent = obj.name;
+      if (obj === activeMesh) li.classList.add('selected');
+      li.addEventListener('click', () => selectObject(obj));
+      list.appendChild(li);
+    });
+  }
+
+  function updateOutlinerUI() {
+    const listItems = document.querySelectorAll('#object-list li');
+    listItems.forEach((li, idx) => {
+      if (objects[idx] === activeMesh) {
+        li.classList.add('selected');
+      } else {
+        li.classList.remove('selected');
+      }
+    });
+  }
+
+  // --- .OBJ ファイルの読み込み (Input) ---
+  function loadOBJFile(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const loader = new OBJLoader();
+      const objGroup = loader.parse(e.target.result);
+      
+      objGroup.traverse((child) => {
+        if (child.isMesh) {
+          child.material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.5, side: THREE.DoubleSide });
+          objectCount++;
+          child.name = `Imported_${objectCount}`;
+          scene.add(child);
+          objects.push(child);
+          selectObject(child);
+        }
+      });
+      updateOutliner();
+    };
+    reader.readAsText(file);
+  }
+
+  // --- スカルプト & UV 3Dペイント ---
   function setupRaycaster() {
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
@@ -242,10 +334,10 @@
   }
 
   function applySculpt(hitPoint, intensity, radius) {
+    if (!activeMesh.geometry.attributes.position) return;
     const pos = activeMesh.geometry.attributes.position;
     const localHit = activeMesh.worldToLocal(hitPoint.clone());
     const symX = document.getElementById('symX').checked;
-    const symPoint = document.getElementById('symPoint').checked;
 
     for (let i = 0; i < pos.count; i++) {
       const v = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
@@ -255,11 +347,6 @@
         const symHit = localHit.clone(); symHit.x *= -1;
         modifyVertex(v, symHit, intensity, radius);
       }
-      if (symPoint) {
-        const symHit = localHit.clone().negate();
-        modifyVertex(v, symHit, intensity, radius);
-      }
-
       pos.setXYZ(i, v.x, v.y, v.z);
     }
     pos.needsUpdate = true;
@@ -283,7 +370,7 @@
 
     uvCtx.fillStyle = color;
     uvCtx.beginPath();
-    uvCtx.arc(x, y, 10, 0, Math.PI * 2);
+    uvCtx.arc(x, y, 12, 0, Math.PI * 2);
     uvCtx.fill();
     texture.needsUpdate = true;
   }
@@ -298,35 +385,61 @@
       if (activeMesh) transform.attach(activeMesh);
     } else {
       transform.detach();
-      orbit.enabled = false; // Disable camera rotate while sculpting or painting
+      orbit.enabled = false;
       if (mode === 'sculpt') document.getElementById('btnModeSculpt').classList.add('active');
       if (mode === 'paint') document.getElementById('btnModePaint').classList.add('active');
     }
   }
 
-  function setupTouchAndUI() {
+  // --- UI Listener Bindings ---
+  function setupUI() {
     document.getElementById('btnModeCam').addEventListener('click', () => switchMode('camera'));
     document.getElementById('btnModeSculpt').addEventListener('click', () => switchMode('sculpt'));
     document.getElementById('btnModePaint').addEventListener('click', () => switchMode('paint'));
 
-    document.getElementById('addShapeBtn').addEventListener('click', () => {
-      addShape(document.getElementById('addShapeSelect').value);
+    document.getElementById('addShapeBtn').addEventListener('click', () => addShape(document.getElementById('addShapeSelect').value));
+    document.getElementById('deleteObjBtn').addEventListener('click', deleteSelectedObject);
+
+    // .OBJ File Import
+    document.getElementById('importObjInput').addEventListener('change', (e) => {
+      if (e.target.files.length > 0) loadOBJFile(e.target.files[0]);
     });
 
+    // Stage Scale Adjustment
+    document.getElementById('stageScale').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      scene.remove(gridHelper);
+      gridHelper = new THREE.GridHelper(val, val * 2, 0x555555, 0x333333);
+      scene.add(gridHelper);
+    });
+
+    // Gizmo Mode Switches
     document.getElementById('gizmoTranslate').addEventListener('click', () => transform.setMode('translate'));
     document.getElementById('gizmoRotate').addEventListener('click', () => transform.setMode('rotate'));
     document.getElementById('gizmoScale').addEventListener('click', () => transform.setMode('scale'));
 
+    // Export .OBJ Output (Exports Scene/Selected)
     document.getElementById('exportObjBtn').addEventListener('click', () => {
-      if (!activeMesh) return;
+      if (objects.length === 0) return;
       const exporter = new OBJExporter();
-      const result = exporter.parse(activeMesh);
+      const exportGroup = new THREE.Group();
+      objects.forEach(o => exportGroup.add(o.clone()));
+      
+      const result = exporter.parse(exportGroup);
       const blob = new Blob([result], { type: 'text/plain' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = 'touch_model.obj';
+      link.download = 'scene_model.obj';
       link.click();
       URL.revokeObjectURL(link.href);
+    });
+
+    // Export UV Texture PNG Output
+    document.getElementById('exportTexBtn').addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.href = uvCanvas.toDataURL('image/png');
+      link.download = 'uv_texture.png';
+      link.click();
     });
   }
 
