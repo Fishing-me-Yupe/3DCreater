@@ -2,43 +2,45 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Web3D Blender Studio + Guide</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Touch-friendly Web3D Studio</title>
   <style>
     :root {
       --bg-dark: #1e1e1e;
       --bg-panel: #2b2b2b;
       --accent: #e67e22;
       --text: #cccccc;
-      --border: #141414;
+      --border: #3f3f3f;
     }
-    * { box-sizing: border-box; user-select: none; }
-    body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: var(--bg-dark); color: var(--text); font-family: sans-serif; font-size: 12px; }
-    #container { display: flex; width: 100vw; height: 100vh; }
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+    body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; background: var(--bg-dark); color: var(--text); font-family: sans-serif; font-size: 14px; }
+    #container { display: flex; flex-direction: column; width: 100vw; height: 100vh; }
     
-    #viewport-container { flex: 1; position: relative; height: 100%; }
-    #canvas3d { width: 100%; height: 100%; display: block; }
+    #viewport-container { flex: 1; position: relative; width: 100%; height: 100%; }
+    #canvas3d { width: 100%; height: 100%; display: block; touch-action: none; }
     
-    /* Top Menu Bar */
-    #top-bar { position: absolute; top: 10px; left: 10px; display: flex; gap: 8px; z-index: 10; background: rgba(43,43,43,0.9); padding: 6px; border-radius: 4px; border: 1px solid #444; flex-wrap: wrap; align-items: center; }
-    button, select { background: #383838; color: var(--text); border: 1px solid #555; padding: 4px 10px; border-radius: 3px; cursor: pointer; font-size: 11px; }
-    button:hover { background: var(--accent); color: #fff; }
+    /* Responsive Top Bar */
+    #top-bar { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; gap: 6px; z-index: 10; background: rgba(43,43,43,0.92); padding: 8px; border-radius: 6px; border: 1px solid var(--border); overflow-x: auto; white-space: nowrap; align-items: center; }
+    button, select { background: #383838; color: var(--text); border: 1px solid #555; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; min-height: 38px; }
+    button:active, button.active { background: var(--accent); color: #fff; }
     
-    /* Quick Guide Modal/Panel */
-    #guide-panel { position: absolute; top: 50px; left: 10px; width: 280px; background: rgba(30,30,30,0.92); border: 1px solid #555; padding: 12px; border-radius: 4px; z-index: 10; line-height: 1.5; max-height: 80vh; overflow-y: auto; }
-    #guide-panel h4 { margin: 0 0 6px 0; color: var(--accent); }
-    #guide-panel ul { margin: 0; padding-left: 18px; }
+    /* Touch Mode Toggle Floating Panel */
+    #touch-modes { position: absolute; bottom: 16px; left: 16px; z-index: 10; display: flex; gap: 8px; background: rgba(30,30,30,0.85); padding: 6px; border-radius: 8px; border: 1px solid var(--border); }
+    .mode-btn { min-width: 60px; text-align: center; font-weight: bold; }
 
-    /* Right Sidebar */
-    #sidebar { width: 300px; background: var(--bg-panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; height: 100%; z-index: 5; overflow-y: auto; }
-    .panel-section { border-bottom: 1px solid var(--border); padding: 10px; }
-    .panel-title { font-weight: bold; margin-bottom: 8px; color: #fff; text-transform: uppercase; font-size: 10px; letter-spacing: 1px; }
-    .control-group { margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
-    .control-group label { flex: 1; }
-    .control-group input, .control-group select { max-width: 120px; }
+    /* Collapsible Right Sidebar */
+    #sidebar { width: 100%; max-height: 40vh; background: var(--bg-panel); border-top: 1px solid var(--border); display: flex; flex-direction: column; z-index: 5; overflow-y: auto; }
+    @media (min-width: 768px) {
+      #container { flex-direction: row; }
+      #sidebar { width: 300px; max-height: 100%; border-top: none; border-left: 1px solid var(--border); }
+    }
     
-    /* UV Window */
-    #uv-window { position: absolute; bottom: 20px; left: 10px; width: 200px; height: 200px; background: rgba(30,30,30,0.9); border: 1px solid #555; border-radius: 4px; display: flex; flex-direction: column; z-index: 10; }
-    #uv-canvas { flex: 1; width: 100%; height: 100%; background: #111; }
+    .panel-section { border-bottom: 1px solid var(--border); padding: 12px; }
+    .panel-title { font-weight: bold; margin-bottom: 8px; color: #fff; text-transform: uppercase; font-size: 11px; letter-spacing: 1px; }
+    .control-group { margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+    .control-group label { flex: 1; }
+    .control-group input[type="range"] { flex: 1; height: 28px; }
+    .control-group input[type="checkbox"] { width: 22px; height: 22px; }
   </style>
 
   <script type="importmap">
@@ -55,68 +57,42 @@
 <div id="container">
   <div id="viewport-container">
     <div id="top-bar">
-      <label>モード:</label>
-      <select id="modeSelect">
-        <option value="object">オブジェクト移動・回転モード</option>
-        <option value="sculpt">スカルプト変形モード</option>
-        <option value="paint">UV 3Dペイントモード</option>
-      </select>
-
-      <label>追加:</label>
       <select id="addShapeSelect">
-        <option value="plane">板ポリ (Plane)</option>
-        <option value="cube" selected>立方体 (Cube)</option>
-        <option value="uvSphere">UV球 (UV Sphere)</option>
-        <option value="icoSphere">ICO球 (Ico Sphere)</option>
-        <option value="cylinder">円柱 (Cylinder)</option>
-        <option value="cone">円錐 (Cone)</option>
-        <option value="torus">トーラス (Torus)</option>
+        <option value="plane">板ポリ</option>
+        <option value="cube" selected>立方体</option>
+        <option value="uvSphere">UV球</option>
+        <option value="icoSphere">ICO球</option>
+        <option value="cylinder">円柱</option>
+        <option value="cone">円錐</option>
+        <option value="torus">トーラス</option>
       </select>
-      <button id="addShapeBtn">+ 図形生成</button>
-      <button id="toggleGuideBtn">操作説明</button>
-      <button id="exportObjBtn" style="margin-left: auto; background: #27ae60;">.OBJ 保存</button>
+      <button id="addShapeBtn">+ 図形追加</button>
+      <button id="exportObjBtn" style="margin-left: auto; background: #27ae60; color: white;">.OBJ 保存</button>
     </div>
 
-    <!-- Quick Guide -->
-    <div id="guide-panel">
-      <h4>基本操作マニュアル</h4>
-      <b>【視点操作】</b>
-      <ul>
-        <li><b>回転:</b> マウス左ドラッグ</li>
-        <li><b>ズーム:</b> マウスホイールスクロール</li>
-        <li><b>平行移動:</b> マウス右ドラッグ</li>
-      </ul>
-      <br>
-      <b>【モード別操作】</b>
-      <ul>
-        <li><b>オブジェクト移動:</b> オブジェクトを選択すると表示される矢印・リングをドラッグして移動・回転。</li>
-        <li><b>スカルプト:</b> モデル表面をドラッグすると盛り上がります（右パネルで線対称・点対称を有効化可能）。</li>
-        <li><b>UV 3Dペイント:</b> モデル上をドラッグして直接色を塗れます（左下のUVキャンバスと連動）。</li>
-      </ul>
-    </div>
-
-    <!-- Floating UV Window -->
-    <div id="uv-window">
-      <div style="background:#333; padding:2px 6px; font-weight:bold;">UVキャンバス</div>
-      <canvas id="uv-canvas" width="256" height="256"></canvas>
+    <!-- Floating Mode Buttons for Mobile -->
+    <div id="touch-modes">
+      <button class="mode-btn active" id="btnModeCam">カメラ</button>
+      <button class="mode-btn" id="btnModeSculpt">スカルプト</button>
+      <button class="mode-btn" id="btnModePaint">ペイント</button>
     </div>
 
     <canvas id="canvas3d"></canvas>
   </div>
 
-  <!-- Sidebar -->
+  <!-- Sidebar (Bottom on Mobile, Right on Tablet/Desktop) -->
   <div id="sidebar">
     <div class="panel-section">
-      <div class="panel-title">ギズモ切替 (Gizmo Mode)</div>
+      <div class="panel-title">ギズモ（操作軸）</div>
       <div class="control-group">
-        <button id="gizmoTranslate" style="width:32%">位置 (G)</button>
-        <button id="gizmoRotate" style="width:32%">回転 (R)</button>
-        <button id="gizmoScale" style="width:32%">拡大 (S)</button>
+        <button id="gizmoTranslate" style="flex:1; margin-right:4px;">位置</button>
+        <button id="gizmoRotate" style="flex:1; margin-right:4px;">回転</button>
+        <button id="gizmoScale" style="flex:1;">拡大</button>
       </div>
     </div>
 
     <div class="panel-section">
-      <div class="panel-title">対称設定 (Symmetry)</div>
+      <div class="panel-title">対称モード</div>
       <div class="control-group">
         <label>X軸 線対称 (Mirror)</label>
         <input type="checkbox" id="symX">
@@ -128,36 +104,19 @@
     </div>
 
     <div class="panel-section">
-      <div class="panel-title">スカルプトブラシ</div>
+      <div class="panel-title">ブラシアジャスト</div>
       <div class="control-group">
-        <label>半径</label>
+        <label>サイズ/半径</label>
         <input type="range" id="brushRadius" min="0.1" max="2" step="0.1" value="0.5">
       </div>
       <div class="control-group">
-        <label>強度 (+/-)</label>
+        <label>スカルプト強度</label>
         <input type="range" id="brushIntensity" min="-0.5" max="0.5" step="0.02" value="0.1">
       </div>
-    </div>
-
-    <div class="panel-section">
-      <div class="panel-title">マテリアル・ペイント</div>
       <div class="control-group">
-        <label>筆色</label>
-        <input type="color" id="paintColor" value="#ff0000">
+        <label>筆カラー</label>
+        <input type="color" id="paintColor" value="#ff0000" style="width:50px; height:35px;">
       </div>
-      <div class="control-group">
-        <label>筆サイズ</label>
-        <input type="range" id="paintSize" min="1" max="30" value="8">
-      </div>
-      <div class="control-group">
-        <label>金属感</label>
-        <input type="range" id="matMetalness" min="0" max="1" step="0.05" value="0.1">
-      </div>
-      <div class="control-group">
-        <label>粗さ</label>
-        <input type="range" id="matRoughness" min="0" max="1" step="0.05" value="0.5">
-      </div>
-      <button id="clearTextureBtn" style="width: 100%; margin-top: 5px;">ペイントをリセット</button>
     </div>
   </div>
 </div>
@@ -170,9 +129,10 @@
 
   let scene, camera, renderer, orbit, transform;
   let activeMesh = null;
-  let activeMode = 'object';
+  let activeMode = 'camera'; // 'camera' | 'sculpt' | 'paint'
 
-  const uvCanvas = document.getElementById('uv-canvas');
+  const uvCanvas = document.createElement('canvas');
+  uvCanvas.width = 256; uvCanvas.height = 256;
   const uvCtx = uvCanvas.getContext('2d');
   let texture;
 
@@ -190,16 +150,22 @@
 
     renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('canvas3d'), antialias: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
     scene.add(new THREE.GridHelper(10, 20, 0x555555, 0x333333));
-    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
 
     const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
     dirLight.position.set(5, 10, 7);
     scene.add(dirLight);
 
+    // OrbitControls Touch Options Optimization
     orbit = new OrbitControls(camera, renderer.domElement);
+    orbit.touches = {
+      ONE: THREE.TOUCH.ROTATE,
+      TWO: THREE.TOUCH.DOLLY_PAN
+    };
+
     transform = new TransformControls(camera, renderer.domElement);
     transform.addEventListener('dragging-changed', (e) => orbit.enabled = !e.value);
     scene.add(transform);
@@ -208,7 +174,7 @@
     addShape('cube');
 
     window.addEventListener('resize', onWindowResize);
-    setupUI();
+    setupTouchAndUI();
     setupRaycaster();
   }
 
@@ -218,7 +184,6 @@
     texture = new THREE.CanvasTexture(uvCanvas);
   }
 
-  // --- 図形生成（Blender標準対応） ---
   function addShape(type) {
     if (activeMesh) scene.remove(activeMesh);
 
@@ -233,34 +198,27 @@
       case 'torus': geometry = new THREE.TorusGeometry(1, 0.4, 16, 32); break;
     }
 
-    const material = new THREE.MeshStandardMaterial({
-      map: texture,
-      roughness: parseFloat(document.getElementById('matRoughness').value),
-      metalness: parseFloat(document.getElementById('matMetalness').value),
-      side: THREE.DoubleSide
-    });
-
+    const material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.5, side: THREE.DoubleSide });
     activeMesh = new THREE.Mesh(geometry, material);
     scene.add(activeMesh);
-    if (activeMode === 'object') transform.attach(activeMesh);
+    if (activeMode === 'camera') transform.attach(activeMesh);
   }
 
-  // --- スカルプト & ペイント ---
+  // --- Sculpting & Painting for Touch Input ---
   function setupRaycaster() {
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
-    let isMouseDown = false;
+    let isTouching = false;
 
-    window.addEventListener('mousedown', () => isMouseDown = true);
-    window.addEventListener('mouseup', () => isMouseDown = false);
-
-    window.addEventListener('mousemove', (e) => {
-      if (!isMouseDown || !activeMesh) return;
-      if (activeMode !== 'sculpt' && activeMode !== 'paint') return;
+    const handlePointer = (e) => {
+      if (!isTouching || !activeMesh || activeMode === 'camera') return;
 
       const rect = renderer.domElement.getBoundingClientRect();
-      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+      mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
 
       raycaster.setFromCamera(mouse, camera);
       const intersects = raycaster.intersectObject(activeMesh);
@@ -275,7 +233,12 @@
           applyPaint(hit.uv);
         }
       }
-    });
+    };
+
+    const dom = renderer.domElement;
+    dom.addEventListener('pointerdown', (e) => { isTouching = true; handlePointer(e); });
+    dom.addEventListener('pointermove', handlePointer);
+    window.addEventListener('pointerup', () => isTouching = false);
   }
 
   function applySculpt(hitPoint, intensity, radius) {
@@ -317,54 +280,42 @@
     const x = uv.x * uvCanvas.width;
     const y = (1 - uv.y) * uvCanvas.height;
     const color = document.getElementById('paintColor').value;
-    const size = document.getElementById('paintSize').value;
 
     uvCtx.fillStyle = color;
     uvCtx.beginPath();
-    uvCtx.arc(x, y, size, 0, Math.PI * 2);
+    uvCtx.arc(x, y, 10, 0, Math.PI * 2);
     uvCtx.fill();
     texture.needsUpdate = true;
   }
 
-  // --- UI setup ---
-  function setupUI() {
-    document.getElementById('modeSelect').addEventListener('change', (e) => {
-      activeMode = e.target.value;
+  function switchMode(mode) {
+    activeMode = mode;
+    document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+
+    if (mode === 'camera') {
+      document.getElementById('btnModeCam').classList.add('active');
+      orbit.enabled = true;
+      if (activeMesh) transform.attach(activeMesh);
+    } else {
       transform.detach();
-      if (activeMode === 'object' && activeMesh) transform.attach(activeMesh);
-    });
+      orbit.enabled = false; // Disable camera rotate while sculpting or painting
+      if (mode === 'sculpt') document.getElementById('btnModeSculpt').classList.add('active');
+      if (mode === 'paint') document.getElementById('btnModePaint').classList.add('active');
+    }
+  }
+
+  function setupTouchAndUI() {
+    document.getElementById('btnModeCam').addEventListener('click', () => switchMode('camera'));
+    document.getElementById('btnModeSculpt').addEventListener('click', () => switchMode('sculpt'));
+    document.getElementById('btnModePaint').addEventListener('click', () => switchMode('paint'));
 
     document.getElementById('addShapeBtn').addEventListener('click', () => {
-      const shapeType = document.getElementById('addShapeSelect').value;
-      addShape(shapeType);
+      addShape(document.getElementById('addShapeSelect').value);
     });
 
-    document.getElementById('toggleGuideBtn').addEventListener('click', () => {
-      const g = document.getElementById('guide-panel');
-      g.style.display = g.style.display === 'none' ? 'block' : 'none';
-    });
-
-    // ギズモ切り替え (G: 位置, R: 回転, S: 拡大)
     document.getElementById('gizmoTranslate').addEventListener('click', () => transform.setMode('translate'));
     document.getElementById('gizmoRotate').addEventListener('click', () => transform.setMode('rotate'));
     document.getElementById('gizmoScale').addEventListener('click', () => transform.setMode('scale'));
-
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'g' || e.key === 'G') transform.setMode('translate');
-      if (e.key === 'r' || e.key === 'R') transform.setMode('rotate');
-      if (e.key === 's' || e.key === 'S') transform.setMode('scale');
-    });
-
-    document.getElementById('matRoughness').addEventListener('input', (e) => {
-      if (activeMesh) activeMesh.material.roughness = parseFloat(e.target.value);
-    });
-    document.getElementById('matMetalness').addEventListener('input', (e) => {
-      if (activeMesh) activeMesh.material.metalness = parseFloat(e.target.value);
-    });
-
-    document.getElementById('clearTextureBtn').addEventListener('click', () => {
-      initUVCanvas();
-    });
 
     document.getElementById('exportObjBtn').addEventListener('click', () => {
       if (!activeMesh) return;
@@ -373,7 +324,7 @@
       const blob = new Blob([result], { type: 'text/plain' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = 'web_model.obj';
+      link.download = 'touch_model.obj';
       link.click();
       URL.revokeObjectURL(link.href);
     });
